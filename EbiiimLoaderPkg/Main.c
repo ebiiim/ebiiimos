@@ -147,28 +147,57 @@ const CHAR16* GetPixelFormatUnicode(EFI_GRAPHICS_PIXEL_FORMAT fmt) {
   }
 }
 
+void Halt(void) { while (1) __asm__("hlt"); }
+
 EFI_STATUS EFIAPI UefiMain( EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_table) {
     Print(L"Hello, ebiiim World!\n");
+
+    EFI_STATUS status;
 
     // save memory map to file
     CHAR8 memmap_buf[4096 * 4];
     struct MemoryMap memmap = {sizeof(memmap_buf), memmap_buf, 0, 0, 0, 0};
-    GetMemoryMap(&memmap);
+    status = GetMemoryMap(&memmap);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to get memory map: %r\n", status);
+        Halt();
+    }
 
     EFI_FILE_PROTOCOL* root_dir;
-    OpenRootDir(image_handle, &root_dir);
+    status = OpenRootDir(image_handle, &root_dir);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to open root dir: %r\n", status);
+        Halt();
+    }
 
     EFI_FILE_PROTOCOL* memmap_file;
-    root_dir->Open(
+    status = root_dir->Open(
         root_dir, &memmap_file, L"\\memmap",
         EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to open file '\\memmap': %r\n", status);
+        Halt();
+    }
 
-    SaveMemoryMap(&memmap, memmap_file);
-    memmap_file->Close(memmap_file);
+    status = SaveMemoryMap(&memmap, memmap_file);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to save memory map: %r\n", status);
+        Halt();
+    }
+    status = memmap_file->Close(memmap_file);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to close memory map: %r\n", status);
+        Halt();
+    }
 
     // gop
     EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
-    OpenGOP(image_handle, &gop);
+    status = OpenGOP(image_handle, &gop);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to open GOP: %r\n", status);
+        Halt();
+    }
+
     UINT8* frame_buffer = (UINT8*)gop->Mode->FrameBufferBase;
     for(UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i){
         frame_buffer[i] = 0x33;
@@ -185,23 +214,39 @@ EFI_STATUS EFIAPI UefiMain( EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_ta
 
     // read kernel
     EFI_FILE_PROTOCOL* kernel_file;
-    root_dir->Open(root_dir, &kernel_file, L"\\kernel.elf", EFI_FILE_MODE_READ, 0);
+    status = root_dir->Open(root_dir, &kernel_file, L"\\kernel.elf", EFI_FILE_MODE_READ, 0);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to open file '\\kernel.elf': %r\n", status);
+        Halt();
+    }
 
     UINTN file_info_size = sizeof(EFI_FILE_INFO) + sizeof(CHAR16) * 12; // "\kernel.elf\0" = 12 * char16
     UINT8 file_info_buffer[file_info_size];
-    kernel_file->GetInfo(kernel_file, &gEfiFileInfoGuid, &file_info_size, file_info_buffer);
+    status = kernel_file->GetInfo(kernel_file, &gEfiFileInfoGuid, &file_info_size, file_info_buffer);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to get file info: %r\n", status);
+        Halt();
+    }
 
     EFI_FILE_INFO* file_info = (EFI_FILE_INFO*)file_info_buffer;
     UINTN kernel_file_size = file_info->FileSize;
 
     EFI_PHYSICAL_ADDRESS kernel_base_addr = 0x100000;
-    gBS->AllocatePages(AllocateAddress, EfiLoaderData,
+    status = gBS->AllocatePages(AllocateAddress, EfiLoaderData,
         (kernel_file_size + 0xfff) / 0x1000, &kernel_base_addr); // ceil(lernel_file_size/0x1000)
-    kernel_file->Read(kernel_file, &kernel_file_size, (VOID*)kernel_base_addr);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to allocate pages: %r", status);
+        Halt();
+    }
+    status = kernel_file->Read(kernel_file, &kernel_file_size, (VOID*)kernel_base_addr);
+    if (EFI_ERROR(status)) {
+        Print(L"failed to read kernel: %r\n", status);
+        Halt();
+    }
+
     Print(L"Kernel: 0x%0lx (%lu bytes)\n", kernel_base_addr, kernel_file_size);
 
     // exit boot services (Print(), file, memory, etc...)
-    EFI_STATUS status;
     status = gBS->ExitBootServices(image_handle, memmap.map_key);
     if (EFI_ERROR(status)) { // expected to fail as memmap is probably not up to date
         status = GetMemoryMap(&memmap);
@@ -222,7 +267,7 @@ EFI_STATUS EFIAPI UefiMain( EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_ta
     typedef void EntryPointType(UINT64, UINT64);
     ((EntryPointType*)entry_addr)(gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize);
 
-    Print(L"All done\n");
+    Print(L"All done!\n");
 
     while (1);
     return EFI_SUCCESS;
