@@ -10,6 +10,7 @@ fi
 
 cd $(dirname $0)
 DISK_IMG=$1
+KERNEL=$2
 
 if [ ! -f $DISK_IMG ]
 then
@@ -23,6 +24,7 @@ mkdir -p mnt
 sudo mount -o loop disk.img mnt
 sudo mkdir -p mnt/EFI/BOOT
 sudo cp ${DISK_IMG} mnt/EFI/BOOT/BOOTX64.EFI
+sudo cp ${KERNEL} mnt/kernel.elf
 sudo umount mnt
 rm -rf mnt
 
