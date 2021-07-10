@@ -218,9 +218,9 @@ EFI_STATUS EFIAPI UefiMain( EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_ta
     
     // call kernel
     UINT64 entry_addr = *(UINT64*)(kernel_base_addr + 24); // ELF has 24 bytes offset to entry point address
-
-    typedef void EntryPointType(void);
-    ((EntryPointType*)entry_addr)(); // address is not callable so do cast
+    // address is not callable so do cast
+    typedef void EntryPointType(UINT64, UINT64);
+    ((EntryPointType*)entry_addr)(gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize);
 
     Print(L"All done\n");
 
