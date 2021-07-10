@@ -1,2 +1,4 @@
 disk.img
 mnt/
+main.o
+kernel.elf
