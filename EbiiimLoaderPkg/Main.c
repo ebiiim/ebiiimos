@@ -1,3 +1,4 @@
+// clang-format off
 #include <Uefi.h>
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
@@ -8,6 +9,8 @@
 #include <Protocol/DiskIo2.h>
 #include <Protocol/BlockIo.h>
 #include <Guid/FileInfo.h>
+
+#include "frame_buffer_config.hpp"
 
 struct MemoryMap {
     UINTN buffer_size;
@@ -190,14 +193,14 @@ EFI_STATUS EFIAPI UefiMain( EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_ta
         Halt();
     }
 
-    // gop
+    // open gop
     EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
     status = OpenGOP(image_handle, &gop);
     if (EFI_ERROR(status)) {
         Print(L"failed to open GOP: %r\n", status);
         Halt();
     }
-
+    // show frame buffer info
     UINT8* frame_buffer = (UINT8*)gop->Mode->FrameBufferBase;
     for(UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i){
         frame_buffer[i] = 0x33;
@@ -211,6 +214,25 @@ EFI_STATUS EFIAPI UefiMain( EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_ta
         gop->Mode->FrameBufferBase,
         gop->Mode->FrameBufferBase + gop->Mode->FrameBufferSize,
         gop->Mode->FrameBufferSize);
+    // create frame buffer config
+    struct FrameBufferConfig config = {
+        (UINT8*)gop->Mode->FrameBufferBase,
+        gop->Mode->Info->PixelsPerScanLine,
+        gop->Mode->Info->HorizontalResolution,
+        gop->Mode->Info->VerticalResolution,
+        0
+    };
+    switch (gop->Mode->Info->PixelFormat) {
+        case PixelRedGreenBlueReserved8BitPerColor:
+            config.pixel_format = kPixelRGBResv8BitPerColor;
+            break;
+        case PixelBlueGreenRedReserved8BitPerColor:
+            config.pixel_format = kPixelBGRResv8BitPerColor;
+            break;
+        default:
+            Print(L"Unimplemented pixel format: %d\n", gop->Mode->Info->PixelFormat);
+            Halt();
+    }
 
     // read kernel
     EFI_FILE_PROTOCOL* kernel_file;
@@ -264,8 +286,8 @@ EFI_STATUS EFIAPI UefiMain( EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_ta
     // call kernel
     UINT64 entry_addr = *(UINT64*)(kernel_base_addr + 24); // ELF has 24 bytes offset to entry point address
     // address is not callable so do cast
-    typedef void EntryPointType(UINT64, UINT64);
-    ((EntryPointType*)entry_addr)(gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize);
+    typedef void EntryPointType(const struct FrameBufferConfig*);
+    ((EntryPointType*)entry_addr)(&config);
 
     Print(L"All done!\n");
 
