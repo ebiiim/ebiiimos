@@ -1,4 +1,4 @@
 disk.img
 mnt/
-main.o
+*.o
 kernel.elf
