@@ -14,6 +14,22 @@ void operator delete(void* obj) noexcept {}  // ~PixelWriter() needs this operat
 char pixel_writer_buf[sizeof(RGBResv8BitPerColorPixelWriter)];
 PixelWriter* pixel_writer;
 
+char console_buf[sizeof(Console)];
+Console* console;
+
+int printk(const char* format, ...) {
+    va_list ap;
+    int result;
+    char s[1024];
+
+    va_start(ap, format);
+    result = vsprintf(s, format, ap);
+    va_end(ap);
+
+    console->PutString(s);
+    return result;
+}
+
 extern "C" void KernelMain(const FrameBufferConfig& frame_buffer_config) {
     switch (frame_buffer_config.pixel_format) {
         case kPixelRGBResv8BitPerColor:
@@ -41,14 +57,12 @@ extern "C" void KernelMain(const FrameBufferConfig& frame_buffer_config) {
     // draw text
     PixelColor console_fg_color = {0xCC, 0xCC, 0xCC};
     PixelColor console_bg_color = {0x33, 0x33, 0x33};
-    Console console{*pixel_writer, console_fg_color, console_bg_color};
+    console = new (console_buf) Console{*pixel_writer, console_fg_color, console_bg_color};
 
-    char buf[128];
     for (int i = 0; i < 28; ++i) {
-        sprintf(buf, "line %d\n", i);
-        console.PutString(buf);
+        printk("line %d\n", i);
     }
-    console.PutString("01234567890123456789012345678901234567890123456789012345678901234567890123456789");
+    printk("01234567890123456789012345678901234567890123456789012345678901234567890123456789");
 
     while (1) __asm__("hlt");
 }
