@@ -17,9 +17,15 @@ const uint8_t* GetFont(char c) {  // returns a pointer cuz this function may ret
 void WriteAscii(PixelWriter& writer, int x, int y, char c, const PixelColor& color) {
     const uint8_t* font = GetFont(c);
     if (font == nullptr) return;
-    for (int dy = 0; dy < 16; ++dy) {
-        for (int dx = 0; dx < 8; ++dx) {
+    for (int dy = 0; dy < FONT_HEIGHT; ++dy) {
+        for (int dx = 0; dx < FONT_WIDTH; ++dx) {
             if (font[dy] << dx & 0x80u) writer.Write(x + dx, y + dy, color);
         }
+    }
+}
+
+void WriteString(PixelWriter& writer, int x, int y, const char* s, const PixelColor& color) {
+    for (int i = 0; s[i] != '\0'; ++i) {
+        WriteAscii(writer, x + FONT_WIDTH * i, y, s[i], color);
     }
 }

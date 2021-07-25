@@ -1,5 +1,5 @@
 TARGET = kernel.elf
-OBJS = main.o graphics.o font.o hankaku.o
+OBJS = main.o graphics.o font.o hankaku.o newlib_support.o
 
 CXXFLAGS += -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone \
     -fno-exceptions -fno-rtti -std=c++17
@@ -14,10 +14,13 @@ clean:
 	rm -rf *.o
 
 kernel.elf: $(OBJS) Makefile # rebuild when Makefile changes
-	ld.lld $(LDFLAGS) -o kernel.elf $(OBJS)
+	ld.lld $(LDFLAGS) -o kernel.elf $(OBJS) --library=c
 
 %.o: %.cpp Makefile # rebuild when Makefile changes
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $<
+
+%.o: %.c Makefile
+	clang $(CPPFLAGS) $(CFLAGS) -c $<
 
 hankaku.o: ../day05c/hankaku.bin
 	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 $< $@
