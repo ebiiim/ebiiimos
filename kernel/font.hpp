@@ -4,8 +4,8 @@
 
 #include "graphics.hpp"
 
-const uint8_t FONT_WIDTH = 8;
-const uint8_t FONT_HEIGHT = 16;
+const int FONT_WIDTH = 8;
+const int FONT_HEIGHT = 16;
 
 const uint8_t* GetFont(char c);
 

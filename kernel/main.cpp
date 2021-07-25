@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdio>
 
+#include "console.hpp"
 #include "font.hpp"
 #include "frame_buffer_config.hpp"
 #include "graphics.hpp"
@@ -38,20 +39,16 @@ extern "C" void KernelMain(const FrameBufferConfig& frame_buffer_config) {
         }
     }
     // draw text
-    PixelColor text_color = {0x33, 0x33, 0x33};
-    auto text_x = 10;
-    auto text_y = 100;
-    auto text_count = 0;
-    for (char x = '!'; x <= '~'; ++x) {
-        WriteAscii(*pixel_writer, text_x + text_count * FONT_WIDTH, text_y, x, text_color);
-        ++text_count;
-    }
-    text_y += FONT_HEIGHT;
-    WriteString(*pixel_writer, text_x, text_y, "Hello, world!", text_color);
-    text_y += FONT_HEIGHT;
+    PixelColor console_fg_color = {0xCC, 0xCC, 0xCC};
+    PixelColor console_bg_color = {0x33, 0x33, 0x33};
+    Console console{*pixel_writer, console_fg_color, console_bg_color};
+
     char buf[128];
-    sprintf(buf, "1 + 2 = %d", 1 + 2);
-    WriteString(*pixel_writer, text_x, text_y, buf, text_color);
+    for (int i = 0; i < 28; ++i) {
+        sprintf(buf, "line %d\n", i);
+        console.PutString(buf);
+    }
+    console.PutString("01234567890123456789012345678901234567890123456789012345678901234567890123456789");
 
     while (1) __asm__("hlt");
 }
